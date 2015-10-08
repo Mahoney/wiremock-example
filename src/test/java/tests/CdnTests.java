@@ -13,8 +13,12 @@ import static org.junit.Assert.assertThat;
 
 public class CdnTests {
 
-    WireMock origin = new WireMock("testwm1.herokuapp.com", 80);
-    HttpClient cdn = new HttpClient("https://testwm1.global.ssl.fastly.net/");
+    String appName = "testwm1";
+    
+    WireMock origin = new WireMock(appName+".herokuapp.com", 80);
+    
+    HttpClient cdn = new HttpClient("https://"+appName+".global.ssl.fastly.net/");
+    
     String path = "/"+RandomStringUtils.randomAlphanumeric(5);
 
     @Test
@@ -22,11 +26,11 @@ public class CdnTests {
 
         // given
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withHeader("Cache-Control", "max-age=30")
-                    .withBody("Response 1")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withHeader("Cache-Control", "max-age=30")
+                .withBody("Old Body")
+            )
         );
 
         // and
@@ -34,14 +38,14 @@ public class CdnTests {
 
         // when
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withBody("Response 2")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withBody("New Body")
+            )
         );
 
         // then
-        assertThat(cdn.get(path).body(), is("Response 1"));
+        assertThat(cdn.get(path).body(), is("Old Body"));
 
     }
 
@@ -49,13 +53,12 @@ public class CdnTests {
     public void cannotPurgeContent() {
 
         // given
-        String path = "/"+RandomStringUtils.randomAlphanumeric(5);
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withHeader("Cache-Control", "max-age=30")
-                    .withBody("Response 1")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withHeader("Cache-Control", "max-age=30")
+                .withBody("Old Body")
+            )
         );
 
         // and
@@ -63,17 +66,17 @@ public class CdnTests {
 
         // and
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withBody("Response 2")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withBody("New Body")
+            )
         );
 
         // when
         HttpResponse purgeResponse = cdn.execute("PURGE", path);
 
         // then
-        assertThat(cdn.get(path).body(), is("Response 1"));
+        assertThat(cdn.get(path).body(), is("Old Body"));
         assertThat(purgeResponse.statusCode(), is(401));
 
     }
@@ -82,13 +85,12 @@ public class CdnTests {
     public void canPurgeContentIfAuthorised() {
 
         // given
-        String path = "/"+RandomStringUtils.randomAlphanumeric(5);
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withHeader("Cache-Control", "max-age=30")
-                    .withBody("Response 1")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withHeader("Cache-Control", "max-age=30")
+                .withBody("Old Body")
+            )
         );
 
         // and
@@ -96,21 +98,21 @@ public class CdnTests {
 
         // and
         origin.register(
-                get(urlEqualTo(path))
-                .willReturn(aResponse()
-                    .withBody("Response 2")
-                )
+            get(urlEqualTo(path))
+            .willReturn(aResponse()
+                .withBody("New Body")
+            )
         );
 
         // when
         cdn.execute(
-                "PURGE",
-                of("Authorization", "Bearer very_secret"),
-                path
+            "PURGE",
+            of("Authorization", "Bearer very_secret"),
+            path
         );
 
         // then
-        assertThat(cdn.get(path).body(), is("Response 2"));
+        assertThat(cdn.get(path).body(), is("New Body"));
 
     }
 
